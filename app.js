@@ -1,6 +1,6 @@
 const inquirer = require("inquirer");
 const orm = require("./config/orm.js");
-const cTable = require("console.table");
+const cTable = require("console-table");
 const connection = require("./config/connection.js");
 
 const initial = [
@@ -75,37 +75,50 @@ function start() {
             })
         } else if (data.actionType === "Add Employee") {
             getRoles(function(result) {
-                const addEmployee = [
-                    {
-                        type: "input",
-                        name: "first_name",
-                        message: "What is the Employee's first name?"
-                    },
-                    {
-                        type: "input",
-                        name: "last_name",
-                        message: "What is the Employee's last name?"
-                    },
-                    {
-                        type: "list",
-                        name: "role",
-                        message: "What is the Employee's role at the company?",
-                        default: "View All Employees",
-                        choices: result
-                    }
-                ];
-                inquirer.prompt(addEmployee).then( (data) => {
-                    if(data.role) {
-                        const queryString = "SELECT id FROM role WHERE title = ?";
-                        connection.query(queryString, [data.role], function(err, result) {
-                            if (err) throw err;
-                            let role_id = result[0].id;
-                            orm.create("employee", ["first_name", "last_name", "role_id"], [data.first_name, data.last_name, role_id], function(result) {
-                                console.log("Employee Added!")
-                            })
-                        });
-                    }
-                    start();
+                getManagers(function(managers) {
+                    const addEmployee = [
+                        {
+                            type: "input",
+                            name: "first_name",
+                            message: "What is the Employee's first name?"
+                        },
+                        {
+                            type: "input",
+                            name: "last_name",
+                            message: "What is the Employee's last name?"
+                        },
+                        {
+                            type: "list",
+                            name: "role",
+                            message: "What is the Employee's role at the company?",
+                            default: "View All Employees",
+                            choices: result
+                        },
+                        {
+                            type: "list",
+                            name: "manager",
+                            message: "Who is the Employee's Manager?",
+                            default: "George Washington",
+                            choices: managers
+                        }
+                    ];
+                    inquirer.prompt(addEmployee).then( (data) => {
+                        if(data.role) {
+                            const queryString = "SELECT id FROM role WHERE title = ?";
+                            connection.query(queryString, [data.role], function(err, result) {
+                                if (err) throw err;
+                                let role_id = result[0].id;
+                                connection.query("SELECT id FROM manager WHERE name = ?", [data.manager], (err, result) => {
+                                    if (err) throw err;
+                                    let manager_id = result[0].id; 
+                                    orm.create("employee", ["first_name", "last_name", "role_id", "manager_id"], [data.first_name, data.last_name, role_id, manager_id], function(result) {
+                                    console.log(`${data.first_name} ${data.last_name} was added to the system!`)
+                                })
+                                })
+                            });
+                        }
+                        start();
+                    })
                 })
             });
         } else if (data.actionType === "Add Role") {
