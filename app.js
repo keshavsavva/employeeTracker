@@ -11,12 +11,15 @@ const initial = [
         default: "View All Employees",
         choices: [
             "View All Employees",
+            "View Employees by Manager",
+            "View Total Utilized Budget",
             "View All Roles",
             "View All Departments",
             "Add Employee",
             "Add Role",
             "Add Department",
             "Update Employee Role",
+            "Update Employee Manager",
             "End"
         ]
     }
@@ -24,11 +27,41 @@ const initial = [
 function start() {
     inquirer.prompt(initial).then(data => {
         if(data.actionType === "View All Employees") {
-            connection.query("SELECT employee.id, employee.first_name as First, employee.last_name as Last, role.title as Role, department.name as Department, role.salary as Salary from employee inner join role on role.id = employee.role_id inner join department on department.id = role.department_id", (err, result) => {
+            connection.query("SELECT employee.id, employee.first_name as First, employee.last_name as Last, role.title as Role, department.name as Department, manager.name as Manager, role.salary as Salary from employee inner join role on role.id = employee.role_id inner join department on department.id = role.department_id inner join manager on manager.id = employee.manager_id", (err, result) => {
                 if (err) throw err;
                 console.table(result);
                 start();
             });
+        } else if (data.actionType === "View Total Utilized Budget") {
+            connection.query("SELECT role.salary FROM employee inner join role on role.id = employee.role_id", (err, result) => {
+                if (err) throw err;
+                let total = 0;
+                result.forEach(salary => {
+                    total = total + salary.salary;
+                })
+                console.log(`We are spending $${total} on employees this year!`)
+                start();
+            })
+        } else if(data.actionType === "View Employees by Manager") {
+            getManagers( function(result) {
+                const viewByManager = [
+                    {
+                        type: "list",
+                        name: "manager",
+                        message: "Whos employees do you want to view?",
+                        default: "George Washington",
+                        choices: result
+                    }
+                ];
+                inquirer.prompt(viewByManager).then( data => {
+                    connection.query("SELECT employee.id, employee.first_name as First, employee.last_name as Last, role.title as Role, department.name as Department, manager.name as Manager, role.salary as Salary from employee inner join role on role.id = employee.role_id inner join department on department.id = role.department_id inner join manager on manager.id = employee.manager_id where manager.name = ?", [data.manager], (err, result) => {
+                    if (err) throw err;
+                    console.table(result);
+                    start();
+                })
+            });
+            })
+            
         } else if (data.actionType === "View All Roles") {
             connection.query("SELECT role.id, role.title as Title, role.salary as Salary, department.name as Department from role inner join department on department.id = role.department_id", (err, result) => {
                 if (err) throw err;
@@ -173,7 +206,52 @@ function start() {
             })
         } else if (data.actionType === "End") {
             console.log("All Done!")
-        }
+        } else if (data.actionType === "Update Employee Manager") {
+            getEmployees( function(result) {
+                let list = [];
+                result.forEach(el => {
+                    let item = `${el.first_name} ${el.last_name}`;
+                    list.push(item);
+                });
+                getManagers(function(managers) {
+                    const updateEmployeeManager = [
+                        {
+                            type: "list",
+                            name: "employeeToBeUpdated",
+                            message: "Which employee's manager would you like to update?",
+                            default: "Keshav Avva",
+                            choices: list
+                        },
+                        {
+                            type: "list",
+                            name: "newManager",
+                            message: "Who should their new manager be?",
+                            default: "George Washington",
+                            choices: managers
+                        }
+                    ];
+                    inquirer.prompt(updateEmployeeManager).then( (data) => {
+                        if (data.newManager) {
+                            connection.query(`SELECT id from manager where name = ?`, [data.newManager], (err, returnId) => {
+                                if (err) throw err;
+                                let manager_id = returnId[0].id;
+                                var names = data.employeeToBeUpdated.split(" ");
+                                var first_name = names[0];
+                                var last_name = names[1];
+                                const queryString = `update employee set manager_id = ? where first_name = ? and last_name = ?`;
+                                connection.query(queryString, [manager_id, first_name, last_name], (err, x) => {
+                                    console.log(`Updated ${data.employeeToBeUpdated}'s manager to ${data.newManager}!`)
+                                })
+                            })
+                            
+    
+                        }
+                        start();
+                    })
+                })
+                
+            })
+        }    
     })
 }
 
@@ -205,4 +283,11 @@ function getEmployees(cb) {
    } )
 }
 
+function getManagers(cb) {
+    var queryString = `SELECT name from manager`;
+    connection.query(queryString, (err, result) => {
+        if(err) throw err;
+        cb(result);
+    })
+}
 start();

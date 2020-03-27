@@ -25,6 +25,13 @@ CREATE TABLE employee
 	first_name varchar(30) NOT NULL,
     last_name varchar(30) NOT NULL,
     role_id INT NOT NULL,
+    manager_id int null,
     primary key (id)
 );
 
+CREATE TABLE manager
+(
+	id int NOT NULL AUTO_INCREMENT,
+	name varchar(30) NOT NULL,
+    primary key (id)
+);
